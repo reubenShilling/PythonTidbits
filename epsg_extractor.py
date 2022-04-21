@@ -35,6 +35,9 @@ for srid in epsg_codes:
     fullName = ogc_wkt[st:end]
     filename = re.sub(r'\W', '_', fullName)
     filename = re.sub(r'__+', '_', filename)
+    filename = re.sub('_$', '', filename)
+    if filename == '':
+        continue
     fullpath = 'F:\\RiderProjects\\EpsgCoordinateSystems\\EpsgCoordinateSystems\\' + filename + '.cs'
     ogc_wkt = ogc_wkt.replace('"', '')
     esri_wkt = esri_wkt.replace('"', '')
