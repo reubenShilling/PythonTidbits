@@ -79,7 +79,7 @@ for root, dirs, files in os.walk(path):
                 f_str = 'using SharpKml.Base;using SharpKml.Dom;' + f_str
                 i = f_str.rfind(';')
                 f_str = f_str[:i] + \
-                        ';\npublic List<LinearRing> Wgs84Boundaries => new List<LinearRing>{' + v_str + '}' + \
+                        ';\npublic List<LinearRing> Wgs84Boundaries => new List<LinearRing>{' + lr_arr_str + '}' + \
                         f_str[i:]
             else:
                 continue
