@@ -1,0 +1,90 @@
+import re
+import os
+
+from pykml import parser
+
+path = r'F:\RiderProjects\EpsgCoordinateSystems\EpsgCoordinateSystems\Resources\USA State Plane Zones NAD83.kml'
+
+kml_dict = {}
+with open(path, 'r') as f:
+    s = f.read()
+    root = parser.fromstring(s)
+    doc = root.Document
+    placemarks = doc.Folder.Placemark
+    for p in placemarks:
+        try:
+            xdata = p.ExtendedData.SchemaData.SimpleData
+            for x in xdata:
+                att_name = x.attrib["name"]
+                if att_name == 'ZONENAME':
+                    zone = x.text.upper()
+            coords = p.Polygon.outerBoundaryIs.LinearRing.coordinates.text
+            kml_dict[zone] = coords
+        except AttributeError:
+            try:
+                coords = []
+                for x in p.MultiGeometry.Polygon:
+                    coords.append(x.outerBoundaryIs.LinearRing.coordinates.text)
+                kml_dict[zone] = coords
+            except AttributeError:
+                continue
+
+path = r'F:\RiderProjects\EpsgCoordinateSystems\EpsgCoordinateSystems\Categories'
+for root, dirs, files in os.walk(path):
+    for cs_file in files:
+        if root != path:
+            continue
+        if re.search('_ftUS.cs$', cs_file) is None:
+            continue
+        if re.search('^NAD83_', cs_file) is None:
+            continue
+        with open(root + '\\' + cs_file, 'r') as f:
+            f_str = f.read()
+            if re.search('new Vector', f_str) is not None:
+                continue
+            if f_str == '':
+                continue
+            name_match = re.search('(?<=Name => ")(.)+?(?=";)', f_str).group().upper()
+            try:
+                coords = kml_dict[name_match]
+            except KeyError:
+                continue
+            if isinstance(coords, str):
+                coords = coords.replace(', ', '').strip()
+                c_arr = coords.split(' ')
+                v_arr = []
+                for s in c_arr:
+                    out_s = 'new Vector(' + s + ')'
+                    v_arr.append(out_s)
+                v_str = ",\n".join(str(x) for x in v_arr)
+                f_str = 'using SharpKml.Base;using SharpKml.Dom;' + f_str
+                i = f_str.rfind(';')
+                f_str = f_str[:i] + \
+                        ';\npublic Geometry Wgs84Boundary => new LinearRing{' \
+                        'Coordinates = new CoordinateCollection(new[]{' + v_str + '})}' + \
+                        f_str[i:]
+            elif isinstance(coords, list):
+                v_str_arr = []
+                for coord in coords:
+                    coord = coord.replace(', ', '').strip()
+                    c_arr = coord.split(' ')
+                    v_arr = []
+                    for s in c_arr:
+                        out_s = 'new Vector(' + s + ')'
+                        v_arr.append(out_s)
+                    v_str = ",\n".join(str(x) for x in v_arr)
+                    v_str = 'new LinearRing{Coordinates = new CoordinateCollection(new[]{' + v_str + '})}'
+                    v_str_arr.append(v_str)
+                lr_arr_str = ",\n".join(str(x) for x in v_str_arr)
+                print lr_arr_str
+                f_str = 'using SharpKml.Base;using SharpKml.Dom;' + f_str
+                i = f_str.rfind(';')
+                f_str = f_str[:i] + \
+                        ';\npublic List<LinearRing> Wgs84Boundaries => new List<LinearRing>{' + v_str + '}' + \
+                        f_str[i:]
+            else:
+                continue
+            with open(root + '\\' + cs_file, 'w') as f:
+                f.seek(0)
+                f.write(f_str)
+                f.truncate()
